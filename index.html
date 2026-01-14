@@ -5,7 +5,25 @@
   <title>Gist Previewer & HTML Hoster</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; }
+    /* Base Styles */
+    body { 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: #0d1117; 
+      color: #c9d1d9; 
+      margin: 0; 
+      padding: 20px; 
+    }
+
+    /* Black Screen / Loading Mode Triggered via JS */
+    body.loading-state { 
+      background: #000 !important; 
+    }
+    body.loading-state #hosterForm, 
+    body.loading-state h1,
+    body.loading-state #output { 
+      display: none !important; 
+    }
+
     a { color: #58a6ff; text-decoration: none; }
     a:hover { text-decoration: underline; }
 
@@ -27,7 +45,6 @@
 <body>
   <h1>Gist Previewer & HTML Hoster</h1>
 
-  <!-- HTML Hoster -->
   <div id="hosterForm" class="card">
     <h2>Create Hosted HTML</h2>
     <textarea id="htmlInput" placeholder="Paste your HTML here..."></textarea>
@@ -40,109 +57,117 @@
     <div id="createdLink" style="margin-top:15px;"></div>
   </div>
 
-  <!-- Gist Preview Output -->
   <div id="output"></div>
 
   <script>
-  // --- Load token from localStorage ---
-  const tokenInput = document.getElementById('tokenInput');
-  const rememberCheckbox = document.getElementById('rememberToken');
-  const storedToken = localStorage.getItem('gistPreviewerToken');
-  if(storedToken) {
-    tokenInput.value = storedToken;
-    rememberCheckbox.checked = true;
-  }
+    // --- 1. IMMEDIATE DETECTION ---
+    // This runs before the rest of the UI logic to ensure a black screen instantly
+    const params = new URLSearchParams(window.location.search);
+    const gistUrl = params.get("gist");
 
-  // --- HTML Hoster ---
-  const hosterForm = document.getElementById('hosterForm');
-  document.getElementById('createGistBtn').addEventListener('click', async () => {
-    const htmlContent = document.getElementById('htmlInput').value;
-    const token = tokenInput.value;
-    const output = document.getElementById('createdLink');
-
-    if (!htmlContent) { output.innerHTML = '<span style="color:red;">Please paste your HTML.</span>'; return; }
-    if (!token) { output.innerHTML = '<span style="color:red;">Please provide your GitHub token.</span>'; return; }
-
-    if(rememberCheckbox.checked) localStorage.setItem('gistPreviewerToken', token);
-    else localStorage.removeItem('gistPreviewerToken');
-
-    output.innerHTML = 'Creating gist…';
-
-    try {
-      const response = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'token ' + token
-        },
-        body: JSON.stringify({
-          description: 'Hosted HTML via Gist Previewer',
-          public: true,
-          files: { 'index.html': { content: htmlContent } }
-        })
-      });
-
-      const data = await response.json();
-      if (!data.html_url) throw new Error('Failed to create gist');
-
-      const previewerLink = `${window.location.origin}${window.location.pathname}?gist=${data.html_url}`;
-      output.innerHTML = `✅ Hosted! Open here: <a href="${previewerLink}" target="_blank">${previewerLink}</a>`;
-    } catch (err) {
-      console.error(err);
-      output.innerHTML = `<span style="color:red;">Error creating gist: ${err.message}</span>`;
-    }
-  });
-
-  // --- Gist Previewer ---
-  const params = new URLSearchParams(window.location.search);
-  const gistUrl = params.get("gist");
-  const outputDiv = document.getElementById('output');
-
-  // Hide HTML hoster if there's a gist URL
-  if(gistUrl) hosterForm.style.display = 'none';
-
-  if (gistUrl) {
-    let gistId = null;
-    let rawFilePath = null;
-
-    if (gistUrl.includes("gist.githubusercontent.com")) {
-      const parts = gistUrl.split("/");
-      gistId = parts[4];
-      rawFilePath = parts.slice(7).join("/");
-    } else {
-      const match = gistUrl.match(/gist.github.com\/[^/]+\/([a-f0-9]+)/i);
-      if (match) gistId = match[1];
+    if (gistUrl) {
+      document.body.classList.add('loading-state');
     }
 
-    if (gistId) {
-      fetch(`https://api.github.com/gists/${gistId}`)
-        .then(res => res.json())
-        .then(data => {
-          let files = Object.values(data.files);
-          if (rawFilePath) files = files.filter(f => f.filename === rawFilePath.split("/").pop());
+    // --- 2. TOKEN MANAGEMENT ---
+    const tokenInput = document.getElementById('tokenInput');
+    const rememberCheckbox = document.getElementById('rememberToken');
+    const storedToken = localStorage.getItem('gistPreviewerToken');
+    if(storedToken) {
+      tokenInput.value = storedToken;
+      rememberCheckbox.checked = true;
+    }
 
-          if (files.length === 0) return;
+    // --- 3. HTML HOSTER LOGIC ---
+    document.getElementById('createGistBtn').addEventListener('click', async () => {
+      const htmlContent = document.getElementById('htmlInput').value;
+      const token = tokenInput.value;
+      const output = document.getElementById('createdLink');
 
-          const file = files[0];
-          if (file.filename.endsWith(".html")) {
-            outputDiv.style.display = 'none';
-            document.open();
-            document.write(file.content);
-            document.close();
-          } else {
-            outputDiv.innerHTML = "<pre>" + escapeHtml(file.content) + "</pre>";
-          }
-        })
-        .catch(err => {
-          console.error(err);
+      if (!htmlContent) { output.innerHTML = '<span style="color:red;">Please paste your HTML.</span>'; return; }
+      if (!token) { output.innerHTML = '<span style="color:red;">Please provide your GitHub token.</span>'; return; }
+
+      if(rememberCheckbox.checked) localStorage.setItem('gistPreviewerToken', token);
+      else localStorage.removeItem('gistPreviewerToken');
+
+      output.innerHTML = 'Creating gist…';
+
+      try {
+        const response = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'token ' + token
+          },
+          body: JSON.stringify({
+            description: 'Hosted HTML via Gist Previewer',
+            public: true,
+            files: { 'index.html': { content: htmlContent } }
+          })
         });
-    }
-  }
 
-  function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
+        const data = await response.json();
+        if (!data.html_url) throw new Error('Failed to create gist');
+
+        const previewerLink = `${window.location.origin}${window.location.pathname}?gist=${data.html_url}`;
+        output.innerHTML = `✅ Hosted! Open here: <a href="${previewerLink}" target="_blank">${previewerLink}</a>`;
+      } catch (err) {
+        output.innerHTML = `<span style="color:red;">Error: ${err.message}</span>`;
+      }
+    });
+
+    // --- 4. GIST PREVIEWER / BLACK SCREEN LOGIC ---
+    const outputDiv = document.getElementById('output');
+
+    if (gistUrl) {
+      let gistId = null;
+      let rawFilePath = null;
+
+      // Extract ID
+      if (gistUrl.includes("gist.githubusercontent.com")) {
+        const parts = gistUrl.split("/");
+        gistId = parts[4];
+        rawFilePath = parts.slice(7).join("/");
+      } else {
+        const match = gistUrl.match(/gist.github.com\/[^/]+\/([a-f0-9]+)/i);
+        if (match) gistId = match[1];
+      }
+
+      if (gistId) {
+        fetch(`https://api.github.com/gists/${gistId}`)
+          .then(res => res.json())
+          .then(data => {
+            let files = Object.values(data.files);
+            if (rawFilePath) files = files.filter(f => f.filename === rawFilePath.split("/").pop());
+
+            if (files.length === 0) {
+              document.body.classList.remove('loading-state');
+              return;
+            }
+
+            const file = files[0];
+            if (file.filename.endsWith(".html")) {
+              // document.write clears the loading-state and the entire page
+              document.open();
+              document.write(file.content);
+              document.close();
+            } else {
+              // If it's code/text, reveal the UI and show the escaped code
+              document.body.classList.remove('loading-state');
+              outputDiv.innerHTML = "<pre>" + escapeHtml(file.content) + "</pre>";
+            }
+          })
+          .catch(err => {
+            // Revert to normal UI if there is an error so the user isn't stuck
+            document.body.classList.remove('loading-state');
+            console.error(err);
+          });
+      }
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
   </script>
 </body>
 </html>
-
