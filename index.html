@@ -5,42 +5,72 @@
   <title>Gist Previewer & HTML Hoster</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    /* General */
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; }
-    h1, h2 { font-weight: bold; }
-    h1 { font-size: 1.8rem; margin-bottom: 20px; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    h1, h2 { font-weight: bold; margin-bottom: 15px; }
+    h1 { font-size: 2rem; }
     h2 { font-size: 1.4rem; margin-top: 40px; }
-    .error { color: #ff7b72; }
-    .file { margin-bottom: 32px; }
-    .filename { font-weight: bold; margin-bottom: 6px; }
-    iframe { width: 100%; height: 100vh; border: none; }
-    textarea { width: 100%; height: 200px; margin-top: 10px; font-family: monospace; }
-    input[type=password] { width: 100%; margin-top: 10px; padding: 8px; font-family: monospace; }
-    button { margin-top: 10px; padding: 10px 20px; cursor: pointer; }
-    #createdLink a { color: #58a6ff; word-break: break-all; }
+
+    /* Card style */
+    .card { background: #161b22; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 30px; }
+
+    /* Inputs and button */
+    textarea, input[type=password] { width: 100%; margin-top: 10px; padding: 10px; border-radius: 8px; border: none; background: #0d1117; color: #c9d1d9; font-family: monospace; font-size: 14px; }
+    button { margin-top: 10px; padding: 12px 25px; border: none; border-radius: 8px; background: #238636; color: #fff; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+    button:hover { background: #2ea043; }
+
+    /* Checkbox */
+    label { font-size: 14px; margin-left: 8px; }
+
+    .error { color: #ff7b72; font-weight: bold; margin-top: 10px; }
+
+    #output pre { white-space: pre-wrap; word-wrap: break-word; background: #161b22; padding: 16px; border-radius: 8px; overflow-x: auto; }
   </style>
 </head>
 <body>
   <h1>Gist Previewer & HTML Hoster</h1>
 
   <!-- HTML Hoster -->
-  <h2>Create Hosted HTML</h2>
-  <textarea id="htmlInput" placeholder="Paste your HTML here..."></textarea>
-  <input id="tokenInput" type="password" placeholder="GitHub Personal Access Token">
-  <button id="createGistBtn">Create Hosted HTML</button>
-  <div id="createdLink"></div>
+  <div id="hosterForm" class="card">
+    <h2>Create Hosted HTML</h2>
+    <textarea id="htmlInput" placeholder="Paste your HTML here..."></textarea>
+    <input id="tokenInput" type="password" placeholder="GitHub Personal Access Token">
+    <div style="margin-top:10px;">
+      <input type="checkbox" id="rememberToken">
+      <label for="rememberToken">Remember token</label>
+    </div>
+    <button id="createGistBtn">Create Hosted HTML</button>
+    <div id="createdLink" style="margin-top:15px;"></div>
+  </div>
 
   <!-- Gist Preview Output -->
-  <div id="output" style="margin-top:40px;">Loading…</div>
+  <div id="output">Loading…</div>
 
   <script>
+  // --- Load token from localStorage if available ---
+  const tokenInput = document.getElementById('tokenInput');
+  const rememberCheckbox = document.getElementById('rememberToken');
+  const storedToken = localStorage.getItem('gistPreviewerToken');
+  if(storedToken) {
+    tokenInput.value = storedToken;
+    rememberCheckbox.checked = true;
+  }
+
   // --- HTML Hoster ---
+  const hosterForm = document.getElementById('hosterForm');
   document.getElementById('createGistBtn').addEventListener('click', async () => {
     const htmlContent = document.getElementById('htmlInput').value;
-    const token = document.getElementById('tokenInput').value;
+    const token = tokenInput.value;
     const output = document.getElementById('createdLink');
 
-    if (!htmlContent) { output.innerHTML = '<span style="color:red;">Please paste your HTML.</span>'; return; }
-    if (!token) { output.innerHTML = '<span style="color:red;">Please provide your GitHub token.</span>'; return; }
+    if (!htmlContent) { output.innerHTML = '<span class="error">Please paste your HTML.</span>'; return; }
+    if (!token) { output.innerHTML = '<span class="error">Please provide your GitHub token.</span>'; return; }
+
+    if(rememberCheckbox.checked) localStorage.setItem('gistPreviewerToken', token);
+    else localStorage.removeItem('gistPreviewerToken');
 
     output.innerHTML = 'Creating gist…';
 
@@ -54,30 +84,28 @@
         body: JSON.stringify({
           description: 'Hosted HTML via Gist Previewer',
           public: true,
-          files: {
-            'index.html': { content: htmlContent }
-          }
+          files: { 'index.html': { content: htmlContent } }
         })
       });
 
       const data = await response.json();
       if (!data.html_url) throw new Error('Failed to create gist');
 
-      // Generate previewer link
       const previewerLink = `${window.location.origin}${window.location.pathname}?gist=${data.html_url}`;
       output.innerHTML = `✅ Hosted! Open here: <a href="${previewerLink}" target="_blank">${previewerLink}</a>`;
     } catch (err) {
       console.error(err);
-      output.innerHTML = `<span style="color:red;">Error creating gist: ${err.message}</span>`;
+      output.innerHTML = `<span class="error">Error creating gist: ${err.message}</span>`;
     }
   });
 
   // --- Gist Previewer ---
   const params = new URLSearchParams(window.location.search);
   const gistUrl = params.get("gist");
+  const outputDiv = document.getElementById('output');
 
   if (!gistUrl) {
-    document.getElementById('output').innerHTML = '<p class="error">No gist parameter provided.</p>';
+    outputDiv.innerHTML = '<p class="error">No gist parameter provided.</p>';
   } else {
     let gistId = null;
     let rawFilePath = null;
@@ -92,7 +120,7 @@
     }
 
     if (!gistId) {
-      document.getElementById('output').innerHTML = '<p class="error">Invalid Gist URL.</p>';
+      outputDiv.innerHTML = '<p class="error">Invalid Gist URL.</p>';
     } else {
       fetch(`https://api.github.com/gists/${gistId}`)
         .then(res => res.json())
@@ -101,23 +129,25 @@
           if (rawFilePath) files = files.filter(f => f.filename === rawFilePath.split("/").pop());
 
           if (files.length === 0) {
-            document.getElementById('output').innerHTML = '<p class="error">No file found in gist.</p>';
+            outputDiv.innerHTML = '<p class="error">No file found in gist.</p>';
             return;
           }
 
           const file = files[0];
           if (file.filename.endsWith(".html")) {
-            // Full-screen HTML render
+            // Hide hoster UI when rendering full-screen HTML
+            hosterForm.style.display = 'none';
+            outputDiv.style.display = 'none';
             document.open();
             document.write(file.content);
             document.close();
           } else {
             // Show code
-            document.getElementById('output').innerHTML = "<pre style='white-space:pre-wrap;word-wrap:break-word;'>" + escapeHtml(file.content) + "</pre>";
+            outputDiv.innerHTML = "<pre>" + escapeHtml(file.content) + "</pre>";
           }
         })
         .catch(err => {
-          document.getElementById('output').innerHTML = '<p class="error">Failed to load gist.</p>';
+          outputDiv.innerHTML = '<p class="error">Failed to load gist.</p>';
           console.error(err);
         });
     }
@@ -129,4 +159,3 @@
   </script>
 </body>
 </html>
-
