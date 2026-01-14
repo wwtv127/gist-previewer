@@ -2,111 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GitHub Gist Previewer</title>
+  <title>Gist Previewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
-      margin: 0;
-      padding: 20px;
-      line-height: 1.5;
-    }
-
-    h1 {
-      color: #58a6ff;
-    }
-
-    .container {
-      background: #161b22;
-      padding: 16px;
-      overflow-x: auto;
-      border-radius: 8px;
-    }
-
-    .error {
-      color: #ff7b72;
-    }
-
-    .file {
-      margin-bottom: 32px;
-    }
-
-    .filename {
-      font-weight: bold;
-      margin-bottom: 6px;
-      color: #79c0ff;
-    }
-
-    pre {
-      margin: 0;
-      padding: 12px;
-      background: #0d1117;
-      border-radius: 6px;
-      overflow-x: auto;
-    }
-
-    code {
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 14px;
-      white-space: pre;
-    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; }
+    h1 { font-size: 1.6rem; }
+    .error { color: #ff7b72; }
+    .file { margin-bottom: 32px; }
+    .filename { font-weight: bold; margin-bottom: 6px; }
+    iframe { width: 100%; height: 500px; border: 1px solid #30363d; border-radius: 8px; }
   </style>
 </head>
 <body>
-
   <h1>GitHub Gist Previewer</h1>
-
-  <div class="container">
-    <div id="output">Loading…</div>
-  </div>
+  <div id="output">Loading…</div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const gistUrl = params.get("gist");
     const output = document.getElementById("output");
 
-    if (!gistUrl) {
-      output.innerHTML = '<p class="error">No gist parameter provided.</p>';
-      throw new Error("Missing gist param");
+    if (!gistUrl) { output.innerHTML = '<p class="error">No gist parameter provided.</p>'; throw new Error("Missing gist param"); }
+
+    let gistId = null;
+    let rawFilePath = null;
+
+    if (gistUrl.includes("gist.githubusercontent.com")) {
+      // RAW Gist URL
+      const parts = gistUrl.split("/");
+      gistId = parts[4]; // Gist ID
+      rawFilePath = parts.slice(7).join("/"); // file path
+    } else {
+      // Normal gist URL
+      const match = gistUrl.match(/gist.github.com\/[^/]+\/([a-f0-9]+)/i);
+      if (match) gistId = match[1];
     }
 
-    const match = gistUrl.match(/gist.github.com\/[^/]+\/([a-f0-9]+)/i);
-    if (!match) {
-      output.innerHTML = '<p class="error">Invalid Gist URL.</p>';
-      throw new Error("Invalid gist URL");
-    }
-
-    const gistId = match[1];
+    if (!gistId) { output.innerHTML = '<p class="error">Invalid Gist URL.</p>'; throw new Error("Invalid gist URL"); }
 
     fetch(`https://api.github.com/gists/${gistId}`)
       .then(res => res.json())
       .then(data => {
         output.innerHTML = "";
+        let files = Object.values(data.files);
 
-        Object.values(data.files).forEach(file => {
+        // Filter for RAW file if specified
+        if (rawFilePath) files = files.filter(f => f.filename === rawFilePath.split("/").pop());
+
+        files.forEach(file => {
           const div = document.createElement("div");
           div.className = "file";
-          div.innerHTML = `
-            <div class="filename">${file.filename}</div>
-            <pre><code>${escapeHtml(file.content)}</code></pre>
-          `;
+
+          if (file.filename.endsWith('.html')) {
+            // Live render HTML files
+            const iframe = document.createElement("iframe");
+            iframe.srcdoc = file.content;
+            div.innerHTML = `<div class="filename">${file.filename} (live preview)</div>`;
+            div.appendChild(iframe);
+          } else {
+            // Show code for other files
+            div.innerHTML = `<div class="filename">${file.filename}</div><pre><code>${escapeHtml(file.content)}</code></pre>`;
+          }
+
           output.appendChild(div);
         });
       })
-      .catch(err => {
-        output.innerHTML = '<p class="error">Failed to load gist.</p>';
-        console.error(err);
-      });
+      .catch(err => { output.innerHTML = '<p class="error">Failed to load gist.</p>'; console.error(err); });
 
-    function escapeHtml(text) {
-      return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
+    function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   </script>
-
 </body>
 </html>
