@@ -53,6 +53,10 @@
       <input type="checkbox" id="rememberToken">
       <label for="rememberToken">Remember token</label>
     </div>
+    <div style="margin-top:10px;">
+      <input type="checkbox" id="secretGist">
+      <label for="secretGist">Create as secret gist</label>
+    </div>
     <button id="createGistBtn">Create Hosted HTML</button>
     <div id="createdLink" style="margin-top:15px;"></div>
   </div>
@@ -83,6 +87,7 @@
       const htmlContent = document.getElementById('htmlInput').value;
       const token = tokenInput.value;
       const output = document.getElementById('createdLink');
+      const secretGist = document.getElementById('secretGist').checked;
 
       if (!htmlContent) { output.innerHTML = '<span style="color:red;">Please paste your HTML.</span>'; return; }
       if (!token) { output.innerHTML = '<span style="color:red;">Please provide your GitHub token.</span>'; return; }
@@ -101,7 +106,7 @@
           },
           body: JSON.stringify({
             description: 'Hosted HTML via Gist Previewer',
-            public: true,
+            public: !secretGist,
             files: { 'index.html': { content: htmlContent } }
           })
         });
