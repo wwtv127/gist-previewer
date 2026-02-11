@@ -45,7 +45,7 @@
       .card { animation: none; transform:none; }
     }
 
-    /* Loading (black-screen) - keep behavior but make it livelier with an overlay spinner */
+    /* Loading (black-screen) - keep behavior but show only black screen */
     body.loading-state { 
       background: #000 !important; 
     }
@@ -56,41 +56,7 @@
       display: none !important; 
     }
 
-    /* Loading overlay and spinner (visible even when other elements are hidden) */
-    body.loading-state::before{
-      content: "Loading preview…";
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 20px;
-      z-index: 9999;
-      color: #9fb7ff;
-      font-weight: 600;
-      font-size: 16px;
-      letter-spacing: 0.4px;
-      background: radial-gradient(circle at 20% 20%, rgba(88,166,255,0.04), transparent 12%), linear-gradient(180deg, rgba(0,0,0,0.75), rgba(0,0,0,0.9));
-      backdrop-filter: blur(6px) saturate(120%);
-      -webkit-backdrop-filter: blur(6px) saturate(120%);
-    }
-    body.loading-state::after{
-      content: "";
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 84px;
-      height: 84px;
-      border-radius: 50%;
-      z-index: 10000;
-      background: conic-gradient(var(--accent), var(--accent-2) 50%, rgba(255,255,255,0.06));
-      filter: blur(6px) opacity(0.95);
-      animation: spin 1.6s linear infinite, pulse 1.8s ease-in-out infinite;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.6), 0 2px 8px rgba(88,166,255,0.06) inset;
-    }
-    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
-    @keyframes pulse { 0%{ transform: translate(-50%, -50%) scale(0.95);}50%{ transform: translate(-50%, -50%) scale(1.06);}100%{ transform: translate(-50%, -50%) scale(0.95);} }
+    /* NOTE: Removed loading overlay and spinner so loading-state is a plain black screen */
 
     a { color: var(--accent); text-decoration: none; transition: color 180ms ease; }
     a:hover { text-decoration: underline; color: #7fb9ff; }
