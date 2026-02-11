@@ -5,41 +5,205 @@
   <title>Gist Previewer & HTML Hoster</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    /* Base Styles */
-    body { 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; 
-      background: #0d1117; 
-      color: #c9d1d9; 
-      margin: 0; 
-      padding: 20px; 
+    /* --- Base / Typography --- */
+    :root{
+      --bg-1: #071021;
+      --bg-2: #0d1117;
+      --card: #0f1720;
+      --muted: #98a1ad;
+      --accent: #58a6ff;
+      --accent-2: #238636;
+      --glass: rgba(255,255,255,0.03);
+      --glass-2: rgba(255,255,255,0.02);
+      --radius: 12px;
     }
 
-    /* Black Screen / Loading Mode Triggered via JS */
+    * { box-sizing: border-box; }
+    html,body { height:100%; }
+    body { 
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(120deg, var(--bg-1), var(--bg-2));
+      background-size: 400% 400%;
+      color: #c9d1d9; 
+      margin: 0; 
+      padding: 28px; 
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      transition: background 600ms ease;
+      animation: slowGradient 18s ease-in-out infinite;
+    }
+
+    @keyframes slowGradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      body { animation: none; transition: none; }
+      .card { animation: none; transform:none; }
+    }
+
+    /* Loading (black-screen) - keep behavior but make it livelier with an overlay spinner */
     body.loading-state { 
       background: #000 !important; 
     }
+    /* Keep the existing hiding behavior (do not change) */
     body.loading-state #hosterForm, 
     body.loading-state h1,
     body.loading-state #output { 
       display: none !important; 
     }
 
-    a { color: #58a6ff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    /* Loading overlay and spinner (visible even when other elements are hidden) */
+    body.loading-state::before{
+      content: "Loading preview…";
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 9999;
+      color: #9fb7ff;
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: 0.4px;
+      background: radial-gradient(circle at 20% 20%, rgba(88,166,255,0.04), transparent 12%), linear-gradient(180deg, rgba(0,0,0,0.75), rgba(0,0,0,0.9));
+      backdrop-filter: blur(6px) saturate(120%);
+      -webkit-backdrop-filter: blur(6px) saturate(120%);
+    }
+    body.loading-state::after{
+      content: "";
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      z-index: 10000;
+      background: conic-gradient(var(--accent), var(--accent-2) 50%, rgba(255,255,255,0.06));
+      filter: blur(6px) opacity(0.95);
+      animation: spin 1.6s linear infinite, pulse 1.8s ease-in-out infinite;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.6), 0 2px 8px rgba(88,166,255,0.06) inset;
+    }
+    @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    @keyframes pulse { 0%{ transform: translate(-50%, -50%) scale(0.95);}50%{ transform: translate(-50%, -50%) scale(1.06);}100%{ transform: translate(-50%, -50%) scale(0.95);} }
 
-    h1, h2 { font-weight: bold; margin-bottom: 15px; }
-    h1 { font-size: 2rem; }
-    h2 { font-size: 1.4rem; margin-top: 40px; }
+    a { color: var(--accent); text-decoration: none; transition: color 180ms ease; }
+    a:hover { text-decoration: underline; color: #7fb9ff; }
 
-    .card { background: #161b22; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); margin-bottom: 30px; }
+    h1 {
+      font-weight: 700;
+      margin-bottom: 18px;
+      font-size: 2rem;
+      letter-spacing: -0.02em;
+      color: #e6eefc;
+      text-shadow: 0 4px 36px rgba(34,88,255,0.06);
+      display: inline-block;
+      transform-origin: left center;
+      animation: titleFloat 6s ease-in-out infinite;
+    }
+    @keyframes titleFloat {
+      0% { transform: translateY(0) }
+      50% { transform: translateY(-4px) }
+      100% { transform: translateY(0) }
+    }
 
-    textarea, input[type=password] { width: 100%; margin-top: 10px; padding: 10px; border-radius: 8px; border: none; background: #0d1117; color: #c9d1d9; font-family: monospace; font-size: 14px; }
-    button { margin-top: 10px; padding: 12px 25px; border: none; border-radius: 8px; background: #238636; color: #fff; cursor: pointer; font-size: 14px; transition: background 0.2s; }
-    button:hover { background: #2ea043; }
+    h2 { font-size: 1.15rem; margin-top: 0; margin-bottom: 10px; color: #dfe9ff; }
 
-    label { font-size: 14px; margin-left: 8px; }
+    /* Card */
+    .card { 
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), var(--glass));
+      padding: 20px; 
+      border-radius: var(--radius); 
+      box-shadow: 0 8px 30px rgba(2,6,23,0.6), 0 1px 0 rgba(255,255,255,0.02) inset;
+      margin-bottom: 30px; 
+      border: 1px solid rgba(255,255,255,0.03);
+      transform: translateY(10px);
+      opacity: 0;
+      animation: cardEnter 520ms cubic-bezier(.2,.9,.3,1) forwards;
+    }
+    @keyframes cardEnter {
+      to { transform: translateY(0); opacity: 1; }
+    }
 
-    #output pre { white-space: pre-wrap; word-wrap: break-word; background: #161b22; padding: 16px; border-radius: 8px; overflow-x: auto; }
+    /* Inputs & textarea */
+    textarea, input[type=password] { 
+      width: 100%; margin-top: 10px; padding: 12px 14px; border-radius: 10px; 
+      border: 1px solid rgba(255,255,255,0.03); background: linear-gradient(180deg, rgba(255,255,255,0.013), rgba(255,255,255,0.01));
+      color: #cbd6e8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace; font-size: 14px; 
+      outline: none; transition: box-shadow 180ms ease, transform 140ms ease, border-color 140ms ease;
+      box-shadow: 0 6px 22px rgba(2,6,23,0.45);
+    }
+    textarea::placeholder, input::placeholder { color: #6f7b88; }
+
+    textarea:focus, input[type=password]:focus {
+      box-shadow: 0 10px 40px rgba(34,88,255,0.06), 0 1px 0 rgba(88,166,255,0.02) inset;
+      border-color: rgba(88,166,255,0.22);
+      transform: translateY(-2px);
+    }
+
+    /* Buttons */
+    button { 
+      margin-top: 12px; padding: 12px 22px; border: none; border-radius: 10px;
+      background: linear-gradient(180deg, var(--accent), #2a93ff);
+      color: #fff; cursor: pointer; font-size: 14px; font-weight: 600;
+      transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+      box-shadow: 0 8px 30px rgba(36,54,80,0.35);
+    }
+    button:hover { transform: translateY(-3px); filter: brightness(1.03); box-shadow: 0 14px 38px rgba(36,54,80,0.45); }
+    button:active { transform: translateY(-1px) scale(0.995); box-shadow: 0 6px 18px rgba(36,54,80,0.28); }
+
+    /* Subtle micro-interactions */
+    label { font-size: 14px; margin-left: 8px; color: var(--muted); }
+    input[type=checkbox] { width: 16px; height: 16px; vertical-align: middle; accent-color: var(--accent-2); }
+
+    /* Output styling */
+    #output pre { 
+      white-space: pre-wrap; word-wrap: break-word; 
+      background: linear-gradient(180deg, rgba(255,255,255,0.012), rgba(255,255,255,0.01));
+      padding: 18px; border-radius: 10px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+      color: #d7e7ff; border: 1px solid rgba(255,255,255,0.03);
+      box-shadow: 0 8px 24px rgba(2,6,23,0.45);
+      transition: transform 260ms ease, opacity 260ms ease;
+      transform-origin: top center;
+      opacity: 0;
+      animation: fadeUp 360ms ease forwards 120ms;
+    }
+    @keyframes fadeUp { from { transform: translateY(8px) scale(0.995); opacity: 0;} to { transform: translateY(0) scale(1); opacity: 1;} }
+
+    /* Created link */
+    #createdLink { margin-top: 12px; font-weight: 600; color: #cfe2ff; }
+    #createdLink a { display: inline-block; padding: 8px 12px; border-radius: 8px; background: linear-gradient(90deg, rgba(88,166,255,0.06), rgba(35,134,54,0.03)); border: 1px solid rgba(255,255,255,0.03); color: var(--accent); transition: transform 220ms ease, box-shadow 220ms ease; text-decoration:none; }
+    #createdLink a:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 8px 28px rgba(34,88,255,0.06); }
+    /* Ensure created link fades in when added */
+    #createdLink { opacity: 0; transform: translateY(6px); transition: transform 260ms ease, opacity 260ms ease; }
+    /* JS will replace innerHTML — keep a small utility class to trigger visible state if needed */
+    #createdLink.visible { opacity: 1; transform: translateY(0); }
+
+    /* Small decorative accent under the title */
+    h1::after {
+      content: "";
+      display: block;
+      width: 54px;
+      height: 6px;
+      margin-top: 14px;
+      border-radius: 12px;
+      background: linear-gradient(90deg, rgba(88,166,255,0.2), rgba(35,134,54,0.12));
+      box-shadow: 0 8px 24px rgba(34,88,255,0.04);
+    }
+
+    /* Small responsiveness */
+    @media (max-width:640px) {
+      body { padding: 16px; }
+      h1 { font-size: 1.6rem; }
+      .card { padding: 16px; }
+      textarea { min-height: 160px; }
+    }
+
   </style>
 </head>
 <body>
@@ -116,6 +280,8 @@
 
         const previewerLink = `${window.location.origin}${window.location.pathname}?gist=${data.html_url}`;
         output.innerHTML = `✅ Hosted! Open here: <a href="${previewerLink}" target="_blank">${previewerLink}</a>`;
+        // gently reveal the created link container with a class (non-essential if JS can't modify)
+        setTimeout(()=>{ output.classList.add('visible'); }, 40);
       } catch (err) {
         output.innerHTML = `<span style="color:red;">Error: ${err.message}</span>`;
       }
